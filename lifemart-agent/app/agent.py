@@ -636,7 +636,71 @@ async def generate_product_image(prompt: str, item_name: str, tool_context: Tool
         return {"error": f"Image generation or upload failed: {str(e)}"}
 
 
+async def generate_item_video(prompt: str, item_name: str, tool_context: ToolContext = None) -> dict:
+    """Generates a short showcase video for a product or pantry item using Google's Omni model (gemini-omni-flash-preview) in the global region.
+    Saves the video as an artifact for the Playground's Artifacts panel and uploads the video bytes to the public Cloud Storage bucket.
+
+    Args:
+        prompt: Description of the video to generate (e.g. 'A close-up continuous smooth shot of fresh cold organic almond milk pouring into a glass mug on a sunny wooden breakfast table').
+        item_name: Short identifier/name for the item (e.g. 'almond_milk_pour').
+        tool_context: Tool context injected by ADK for artifact saving.
+
+    Returns:
+        A dictionary with the public video URL, filename, and confirmation status.
+    """
+    try:
+        import base64
+
+        # 1. Initialize GenAI client pointing to global Vertex AI
+        client = genai.Client(
+            vertexai=True,
+            project=PROJECT_ID,
+            location="global",
+        )
+
+        # 2. Call gemini-omni-flash-preview interactions API
+        interaction = await client.aio.interactions.create(
+            model="gemini-omni-flash-preview",
+            input=prompt,
+        )
+
+        if not hasattr(interaction, "output_video") or not interaction.output_video:
+            return {"error": "Omni model did not return output_video data."}
+
+        raw_video_data = interaction.output_video.data
+        video_bytes = base64.b64decode(raw_video_data) if isinstance(raw_video_data, str) else raw_video_data
+
+        clean_name = "".join(c if c.isalnum() or c in "_-" else "_" for c in item_name.lower())
+        timestamp = int(datetime.datetime.now().timestamp())
+        filename = f"{clean_name}_{timestamp}.mp4"
+
+        # 3. Save artifact to ADK ToolContext so it shows up in the Playground's Artifacts panel
+        if tool_context:
+            artifact_part = types.Part.from_bytes(data=video_bytes, mime_type="video/mp4")
+            await tool_context.save_artifact(filename=filename, artifact=artifact_part)
+
+        # 4. Upload video bytes to public Cloud Storage bucket
+        storage_client = storage.Client(project=PROJECT_ID)
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(filename)
+        blob.upload_from_string(video_bytes, content_type="video/mp4")
+
+        public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
+
+        return {
+            "status": "success",
+            "item_name": item_name,
+            "filename": filename,
+            "public_url": public_url,
+            "message": f"Generated video for '{item_name}' and published to {public_url}",
+        }
+
+    except Exception as e:
+        return {"error": f"Video generation or upload failed: {str(e)}"}
+
+
 from google.adk.code_executors.agent_engine_sandbox_code_executor import AgentEngineSandboxCodeExecutor
+
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.tools.preload_memory_tool import PreloadMemoryTool
@@ -644,6 +708,8 @@ from google.adk.memory import VertexAiMemoryBankService
 
 MEMORY_BANK_ID = "3156437299089113088"
 LOCATION = "us-east1"
+AGENT_ENGINE_RESOURCE = f"projects/365041171409/locations/{LOCATION}/reasoningEngines/{MEMORY_BANK_ID}"
+
 
 
 async def generate_memories_callback(callback_context: CallbackContext):
@@ -661,27 +727,46 @@ def memory_bank_service_builder():
     )
 
 
+from a2ui.inference_formats.direct_json.prompt_generator import DirectJsonPromptGenerator
+from a2ui.core.basic_catalog.v0_8 import BasicCatalog
+from .a2ui_utils import a2ui_callback
+
+
+base_role_desc = (
+    "You are LifeMart Concierge, an intelligent everyday living and marketplace assistant.\n\n"
+    "MEMORY & SAFETY RULES:\n"
+    "- Long-term memory is active. You MUST proactively capture and remember all user-stated allergies "
+    "(e.g., dairy, peanuts, gluten, soy, shellfish, bee venom, latex, etc.), medical dietary restrictions, "
+    "and household sensitivities across conversations.\n"
+    "- Whenever a user reveals an allergy, acknowledge it and commit it to memory so future sessions recall it.\n"
+    "- When recommending products, building grocery carts, or suggesting alternatives, ALWAYS cross-check the user's "
+    "known allergies retrieved from memory and strictly filter out or warn about any conflicting ingredients or allergens.\n\n"
+    "CORE CAPABILITIES:\n"
+    "You help users discover products, check stock, browse categories, manage inventory, "
+    "calculate cart prices and bundle discounts, place orders, compare global market prices, "
+    "geocode delivery addresses, count distance-based shipping fees, locate nearby supply hubs, "
+    "generate photorealistic product visuals, generate short showcase videos, and perform complex calculations or simulations via sandboxed Python code.\n\n"
+    "WORKFLOW & A2UI GUIDELINES:\n"
+    "Analyze the request, call relevant tools, and return structured A2UI display cards when appropriate.\n"
+    "Keep every surface tiny and flat: ONE Card > ONE Column > a few Text rows. Never nest a Card inside a Card. "
+    "Use ONLY these components: Card, Column, Row, Text, and Image. Do not use Table or Heading, or Buttons/actions. "
+    "You may include one Image component when you have a public https URL. Set the Image url to that exact https link. "
+    "No markdown in text; use the usageHint property ('h1', 'h2', 'body') for headings and emphasis. "
+    "Output ONLY the raw A2UI JSON array — no prose, and never wrap it in <a2a_datapart_json> tags."
+)
+
+a2ui_generator = DirectJsonPromptGenerator(catalogs=[BasicCatalog()])
+instruction = f"{base_role_desc}\n\n{a2ui_generator.generate()}"
+
+
+
 root_agent = Agent(
     name="root_agent",
     model=Gemini(
         model=MODEL,
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
-    instruction=(
-        "You are LifeMart Concierge, an intelligent everyday living and marketplace assistant.\n\n"
-        "MEMORY & SAFETY RULES:\n"
-        "- Long-term memory is active. You MUST proactively capture and remember all user-stated allergies "
-        "(e.g., dairy, peanuts, gluten, soy, shellfish, bee venom, latex, etc.), medical dietary restrictions, "
-        "and household sensitivities across conversations.\n"
-        "- Whenever a user reveals an allergy, acknowledge it and commit it to memory so future sessions recall it.\n"
-        "- When recommending products, building grocery carts, or suggesting alternatives, ALWAYS cross-check the user's "
-        "known allergies retrieved from memory and strictly filter out or warn about any conflicting ingredients or allergens.\n\n"
-        "CORE CAPABILITIES:\n"
-        "You help users discover products, check stock, browse categories, manage inventory, "
-        "calculate cart prices and bundle discounts, place orders, compare global market prices, "
-        "geocode delivery addresses, count distance-based shipping fees, locate nearby supply hubs, "
-        "generate photorealistic product visuals, and perform complex calculations or simulations via sandboxed Python code."
-    ),
+    instruction=instruction,
     code_executor=AgentEngineSandboxCodeExecutor(
         agent_engine_resource_name=AGENT_ENGINE_RESOURCE,
     ),
@@ -699,14 +784,18 @@ root_agent = Agent(
         find_nearby_places,
         calculate_shipping_fee_by_distance,
         generate_product_image,
+        generate_item_video,
     ],
+    after_model_callback=a2ui_callback,
     after_agent_callback=generate_memories_callback,
 )
+
 
 app = App(
     root_agent=root_agent,
     name="app",
 )
+
 
 
 

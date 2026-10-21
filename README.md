@@ -1,198 +1,134 @@
-<div align="center">
+# LifeMart Concierge 🛒🌿
 
-<img src="assets/build-with-gemini-banner.png" alt="Build with Gemini" width="100%" />
+An intelligent, multi-tool everyday living and pantry assistant built on Google Agent Development Kit (ADK) and deployed to Google Cloud Agent Platform.
 
-# 🚀 Build with Gemini · Track 3
-
-### The starter kit for Track 3 of the Build with Gemini World Tour, and a showcase of what participants built with it.
-
-Clone this repo, open [Antigravity](https://antigravity.google), and build your own agent-first app on Google Cloud. Every project in the [gallery below](#-featured-projects) was built the same way: prototyped with Antigravity and `agents-cli`, equipped with Memory, tools, and storage, deployed to Agent Platform, and given a face on Cloud Run.
-
-<br/>
-
-![Build with Gemini](https://img.shields.io/badge/Build%20with%20Gemini-World%20Tour-4285F4?logo=google&logoColor=white)
-![Track 3](https://img.shields.io/badge/Track%203-Agent--First%20Apps-EA4335)
-![Google Cloud](https://img.shields.io/badge/Google%20Cloud-Agent%20Platform-4285F4?logo=googlecloud&logoColor=white)
-![Built with ADK](https://img.shields.io/badge/Built%20with-ADK%20%2B%20agents--cli-34A853)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
-![Projects](https://img.shields.io/badge/Projects-8-blue)
-
-<sub>📖 <a href="https://cszhu.github.io/build-with-gemini/">Lab Guide</a> · 🛠️ <a href="https://google.github.io/agents-cli/guide/getting-started/">agents-cli</a> · 🤖 <a href="https://google.github.io/adk-docs/">ADK</a></sub>
-
-</div>
+![LifeMart Concierge Demo](demo.gif)
 
 ---
 
-## 📚 Table of Contents
+## Overview
 
-- [🧩 Anatomy of a Track 3 Project](#-anatomy-of-a-track-3-project)
-- [📂 Featured Projects](#-featured-projects)
-  - [🛍️ Commerce & Marketplace Agents](#️-commerce--marketplace-agents)
-  - [🍳 Food & Recipe Agents](#-food--recipe-agents)
-  - [✈️ Travel & Local Agents](#️-travel--local-agents)
-  - [💪 Health, Fitness & Wellness Agents](#-health-fitness--wellness-agents)
-  - [📚 Learning & Knowledge Agents](#-learning--knowledge-agents)
-  - [🎨 Creative & Media Agents](#-creative--media-agents)
-  - [🏢 Productivity & Enterprise Agents](#-productivity--enterprise-agents)
-  - [🧪 Experimental & Other](#-experimental--other)
-- [🧠 What's in this Repo](#-whats-in-this-repo)
-- [🧰 Build Your Own](#-build-your-own)
-- [📚 Resources](#-resources)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+**LifeMart Concierge** helps households browse smart grocery and home essentials, safely filter allergens across conversations using persistent memory, calculate multi-item bundle discounts and taxes, track pantry replenishment timelines, compute distance-based delivery fees, and generate photorealistic product visuals and showcase videos.
 
 ---
 
-## 🧩 Anatomy of a Track 3 Project
+## Implemented Architecture & Google Cloud Integrations
 
-Every app in this collection is built from the same set of Google Cloud building blocks introduced in the lab. Once you understand this shape, you can read any project here at a glance:
+The agent is implemented in `app/agent.py` and configured with:
 
-| Layer | What it does | Powered by |
-|---|---|---|
-| 🤖 **The Agent** | The core reasoning loop | [ADK](https://google.github.io/adk-docs/) + [`agents-cli`](https://google.github.io/agents-cli/guide/getting-started/), scaffolded with [Antigravity](https://antigravity.google) |
-| 🧠 **Memory** | Remembers facts across sessions | [Agent Platform Memory Bank](https://docs.cloud.google.com/gemini-enterprise-agent-platform/scale/memory-bank) |
-| 🗄️ **Structured data** | Inventory, records, lists | [Firestore](https://console.cloud.google.com/firestore) |
-| 🖼️ **Files & blobs** | Images, media, assets | [Cloud Storage](https://console.cloud.google.com/storage) |
-| 🔧 **Tools** | Take real actions and fetch real data | ADK function tools |
-| 🎨 **Media generation** | Creates images (and video) on demand | `gemini-3.1-flash-lite-image` (Nano Banana 2 Lite) · Omni (video) |
-| 🧪 **Code sandbox** | Safely runs generated code | Agent Platform code execution |
-| 🪟 **Agent-first UI** | Cards and tables instead of plain text | [A2UI](https://adk.dev/integrations/a2ui/) |
-| 🌐 **Frontend** | A shareable web face | FastAPI proxy on [Cloud Run](https://cloud.google.com/run) |
+1. **Vertex AI Memory Bank (`PreloadMemoryTool` & `VertexAiMemoryBankService`)**
+   - Automatically saves conversation sessions across turns.
+   - Proactively remembers user-stated allergies (dairy, peanuts, gluten), household size, and dietary restrictions to enforce ingredient safety checks across separate sessions.
 
----
+2. **Cloud Firestore Database**
+   - Live inventory management (`products` collection) and order persistence (`orders` collection).
+   - Functions implemented:
+     - `list_products`: Query inventory filtered by category (`groceries`, `household`, `pantry`).
+     - `search_products`: Search items by name, description, or tags.
+     - `add_product` & `update_product_stock`: Real-time stock increments and inventory management.
+     - `checkout_order`: Verifies inventory, decrements stock, and commits order confirmation records.
 
-## 📂 Featured Projects
+3. **Multimodal Image Generation (`gemini-3.1-flash-lite-image`)**
+   - `generate_product_image`: Generates photorealistic product and bundle visuals in the Vertex AI `global` region.
+   - Saves images to the Playground via `tool_context.save_artifact` and uploads directly to Google Cloud Storage.
 
-A showcase of what workshop participants built with this lab. Entries are added here from the swag and gallery submission form after each event, so the categories below start empty and fill in over time. Browse them for inspiration, or [submit your own](#-contributing) once you've published your project with the `publish-to-github` skill.
+4. **Showcase Video Generation (`gemini-omni-flash-preview`)**
+   - `generate_item_video`: Generates short continuous showcase videos of pantry items using Google's Omni foundation model in the Vertex AI `global` region.
+   - Saves video artifacts locally and publishes public MP4 assets to Cloud Storage.
 
-<!--
-Add one entry per project, in this format:
-- 🌿 **[Project Name](https://github.com/their-handle/their-repo)**: one-line description of what it does. <br/> <sub>by [@handle](https://github.com/handle)</sub>
+5. **Google Cloud Storage (GCS)**
+   - Serves as the public asset bucket for generated product images and demo videos.
 
-Bump the "Projects" badge count at the top when you add one.
--->
+6. **Agent Engine Sandbox Code Executor (`AgentEngineSandboxCodeExecutor`)**
+   - Executes arbitrary sandboxed Python code for custom mathematical formulas, household consumption rates, and complex basket pricing simulations.
 
-### 🛍️ Commerce & Marketplace Agents
+7. **A2UI v0.8 & Rich Display Cards**
+   - Formats product listings, order summaries, and cart totals into clean, responsive A2UI cards (`Card`, `Column`, `Row`, `Text`, `Image`).
+   - Wired via `DirectJsonPromptGenerator` and `a2ui_callback`.
 
-### 🍳 Food & Recipe Agents
+8. **Google Maps Geocoding & Places Tools**
+   - `geocode_address`: Converts delivery addresses into coordinates.
+   - `calculate_shipping_fee_by_distance`: Computes distance-based delivery tiers (Hyper-Local, Regional Metro, Extended Delivery).
+   - `find_nearby_places`: Searches for nearby grocery hubs and supermarkets.
 
-- 🥫 **[Smart Pantry Recipe Concierge](https://github.com/matthewrose/buildwithgemini-smart-pantry-recipe-concierge)**: Tracks your pantry and recommends recipes grounded in a real recipe corpus. <br/> <sub>by [@matthewrose](https://github.com/matthewrose)</sub>
-
-### ✈️ Travel & Local Agents
-
-- ⛈️ **[SafeStageWX](https://github.com/felix1028/buildwithgemini-safestagewx)**: An agentic mobile app that helps event planners identify weather threats and climate risks for an event given its date and location, providing tailored preparedness timelines from months out down to hourly day-of forecasts. <br/> <sub>by [@felix1028](https://github.com/felix1028)</sub>
-- 🌇 **[Sidewalk & Sun](https://github.com/OlafHaalstra/buildwithgemini-sidewalk-and-sun)**: Recommends sunny or shaded NYC spots from a curated 500-venue corpus, plotted on an interactive map. <br/> <sub>by [@OlafHaalstra](https://github.com/OlafHaalstra)</sub>
-
-### 💪 Health, Fitness & Wellness Agents
-
-- 🏊 **[TriCoach AI](https://github.com/common-aman/buildwithgemini-tricoach-ai)**: A triathlon coach that logs workouts, computes training zones, and generates motivational visuals. <br/> <sub>by [@common-aman](https://github.com/common-aman)</sub>
-
-### 📚 Learning & Knowledge Agents
-
-- 🎤 **[Interview Coach (PrepPal)](https://github.com/VineethBaradi/buildwithgemini-interview-coach)**: A mock-interview coach that runs LLM-driven practice sessions from a Firestore question bank and gives performance feedback. <br/> <sub>by [@VineethBaradi](https://github.com/VineethBaradi)</sub>
-
-### 🎨 Creative & Media Agents
-
-### 🏢 Productivity & Enterprise Agents
-
-- 🔧 **[GitCraft](https://github.com/fpobletemu/buildwithgemini-gitcraft)**: A developer git assistant that inspects your repo and drafts Conventional-Commits-style messages, grounded in a commit-style guide. <br/> <sub>by [@fpobletemu](https://github.com/fpobletemu)</sub>
-- 🖥️ **[IT Helpdesk Agent](https://github.com/NaweedAhmadi/buildwithgemini-it-helpdesk-agent)**: An IT support assistant that answers from a knowledge base and remembers context across sessions, with a ticket dashboard UI. <br/> <sub>by [@NaweedAhmadi](https://github.com/NaweedAhmadi)</sub>
-
-### 🧪 Experimental & Other
-
-- 🃏 **[Poker Agent](https://github.com/jakecho1108/buildwithgemini-poker-agent)**: A poker trainer with a real 800-iteration Monte Carlo equity engine and strategy tips grounded in a poker playbook. <br/> <sub>by [@jakecho1108](https://github.com/jakecho1108)</sub>
+9. **External Benchmark Price Comparison**
+   - `fetch_global_market_products`: Compares internal catalog items with external marketplace listings.
 
 ---
 
-## 🧠 What's in this Repo
+## Project Structure
 
-The `.agents/` folder teaches Antigravity how to build agents on Google Cloud.
-
-### Skills
-
-A **skill** is a bundle of instructions that loads automatically when it's relevant, so the agent gets the workflow right in fewer steps instead of rediscovering it each time.
-
-| Skill | What it does |
-| --- | --- |
-| [`pick-your-agent-project`](.agents/skills/pick-your-agent-project/SKILL.md) | Brainstorm your app idea and write a project brief |
-| [`troubleshoot-lab-setup`](.agents/skills/troubleshoot-lab-setup/SKILL.md) | Verify your environment and fix common setup errors |
-| [`memory-bank-setup`](.agents/skills/setup-memory-bank/SKILL.md) | Add cross-session memory to your agent with Vertex AI Memory Bank |
-| [`enable-a2ui`](.agents/skills/enable-a2ui/SKILL.md) | Make your agent reply with rich UI cards (A2UI) in the ADK dev UI |
-| [`build-agent-frontend`](.agents/skills/build-agent-frontend/SKILL.md) | Generate a FastAPI chat frontend and ship it to Cloud Run |
-| [`record-demo`](.agents/skills/record-demo/SKILL.md) | Record a branded demo video of your agent, with an optional AI soundtrack |
-| [`publish-to-github`](.agents/skills/publish-to-github/SKILL.md) | Publish your finished project to your own GitHub and submit it for swag |
-
-### Pre-configured tools (MCP)
-
-[`.agents/mcp_config.json`](.agents/mcp_config.json) wires up two [Model Context Protocol](https://modelcontextprotocol.io/) servers that authenticate with your gcloud credentials, so the agent can look things up instead of guessing:
-
-- **Firebase**: work directly with Firestore and other Firebase services
-- **Google Developer Knowledge**: grounded access to Google's official docs (Cloud, Firebase, ADK, Agent Platform)
-
-### Layout
-
-```text
-.agents/
-├── mcp_config.json    # Firebase + Developer Knowledge MCP servers
-├── rules/             # workspace rules (only deploy when asked)
-└── skills/            # the workshop skills listed above
+```
+.
+├── app/
+│   ├── __init__.py          # App initialization
+│   ├── agent.py             # Root agent, tools, memory callback, and A2UI wiring
+│   └── a2ui_utils.py        # A2UI after_model_callback handler
+├── frontend/
+│   ├── static/
+│   │   └── index.html       # Chat web frontend with custom emerald pantry theme & A2UI renderer
+│   ├── main.py              # FastAPI A2A proxy server
+│   └── requirements.txt     # Frontend proxy dependencies
+├── agents-cli-manifest.yaml # Agent Engine runtime configuration
+├── pyproject.toml           # Agent dependencies (ADK, GenAI SDK, Firestore, A2UI)
+├── demo.gif                 # Screen recording demo of the chat UI
+└── README.md
 ```
 
 ---
 
-## 🧰 Build Your Own
+## Local Development & Setup
 
-The full, step-by-step walkthrough lives on the **[lab guide](https://cszhu.github.io/build-with-gemini/)**. This is the short version.
+### Prerequisites
 
-**Prerequisites** (the lab workstation comes with all of this pre-installed; you'll need it if you're running on your own machine):
+- Python 3.11+
+- `uv` package manager or `pip`
+- Google Cloud SDK (`gcloud`) authenticated to a GCP project
 
-- A **Google Cloud project** with billing enabled
-- **[Antigravity](https://antigravity.google)** (`agy`), the coding agent that loads the skills above
-- **[agents-cli](https://google.github.io/agents-cli/guide/getting-started/)**, built on the [Agent Development Kit (ADK)](https://google.github.io/adk-docs/)
-- Authenticated gcloud: `gcloud auth login` and `gcloud auth application-default login`
-- A personal **GitHub account** for the final publish-and-submit step
+### 1. Running the Agent in Local ADK Playground
 
-**Quickstart:**
+Install dependencies and start the ADK Web playground:
 
 ```bash
-git clone https://github.com/cszhu/build-with-gemini
-cd build-with-gemini
-agy
+# Set Google Cloud environment variables
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export GOOGLE_CLOUD_PROJECT="<YOUR_GCP_PROJECT_ID>"
+export GOOGLE_CLOUD_LOCATION="global"
+
+# Start ADK Web with memory bank
+uv run adk web . --port 8000 --reload_agents
 ```
 
-On startup, Antigravity scans the `.agents/` folder and loads the skills and tools above automatically. In the AGY prompt:
+### 2. Running the Custom Chat Frontend
 
-```text
-/skills            # see the installed skills
-/mcp               # confirm the firebase + google-developer-knowledge tools are connected
+Run the FastAPI A2A proxy and chat UI:
+
+```bash
+cd frontend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+export AGENT_ENGINE_RESOURCE_NAME="projects/<PROJECT_NUMBER>/locations/<LOCATION>/reasoningEngines/<ENGINE_ID>"
+export AGENT_DIRECTORY="app"
+python main.py
 ```
-
-```text
-Verify my setup.   # runs the troubleshoot-lab-setup skill to check your environment
-```
-
-Then follow the [lab guide](https://cszhu.github.io/build-with-gemini/) to design, build, deploy, and share your agent, start to finish.
 
 ---
 
-## 📚 Resources
+## Deploying
 
-- **[Lab guide](https://cszhu.github.io/build-with-gemini/)**: the step-by-step workshop
-- [Antigravity](https://antigravity.google)
-- [agents-cli](https://google.github.io/agents-cli/guide/getting-started/)
-- [Agent Development Kit (ADK)](https://google.github.io/adk-docs/)
-- [Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform)
+### Deploy Agent to Agent Engine
+```bash
+agents-cli deploy --project <YOUR_GCP_PROJECT_ID>
+```
 
----
-
-## 🤝 Contributing
-
-**Built something?** Publish it with the `publish-to-github` skill and submit it through the form it gives you. Submissions get you swag, and standout projects get added to the [Featured Projects](#-featured-projects) gallery above.
-
-**Found a bug?** If you hit a rough edge in a skill or the lab, please [open an issue](https://github.com/cszhu/build-with-gemini/issues).
-
----
-
-## 📄 License
-
-This is not an officially supported Google product and is provided for the Build with Gemini workshop for demonstration purposes only.
+### Deploy Frontend to Cloud Run
+```bash
+cd frontend
+gcloud run deploy lifemart-frontend \
+  --source . \
+  --region us-east1 \
+  --allow-unauthenticated \
+  --set-env-vars AGENT_ENGINE_RESOURCE_NAME="<YOUR_AGENT_RESOURCE_NAME>",AGENT_DIRECTORY="app"
+```
